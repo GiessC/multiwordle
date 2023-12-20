@@ -62,6 +62,16 @@ export default class Guess {
 
         const wrongMap = new Map<string, number>();
 
+        if (this.toString() === word) {
+            return [
+                GuessResult.CORRECT,
+                GuessResult.CORRECT,
+                GuessResult.CORRECT,
+                GuessResult.CORRECT,
+                GuessResult.CORRECT,
+            ];
+        }
+
         for (let i = 0; i < this._letters.length; i++) {
             if (this._letters[i] === word[i]) {
                 result[i] = GuessResult.CORRECT;
@@ -104,14 +114,13 @@ export default class Guess {
             throw new Error('Dictionary API error: no URL could be found');
         }
         try {
-            const response = await trackPromise(
+            await trackPromise(
                 axios.get(
                     `${
                         process.env.REACT_APP_DICTIONARY_API
                     }/${this.toString()}`,
                 ),
             );
-            console.debug(response);
             return true;
         } catch (error: unknown) {
             if (error instanceof AxiosError) {
@@ -120,13 +129,12 @@ export default class Guess {
                     throw new Error(
                         'Too many requests! Guesses are being entered too quick for us too keep up!',
                     );
-                console.error(error);
             } else {
                 throw error;
             }
-        } finally {
-            return false;
+            console.error(error);
         }
+        return false;
     }
 
     public get letters(): string[] {

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Game from './Game';
+import Game from './components/game/Game';
 import { GameStatus } from './types/GameStatus';
-import Guess from './types/Guess';
+import Guess, { GuessResult } from './types/Guess';
 import { generate } from 'random-words';
 import { usePromiseTracker } from 'react-promise-tracker';
 import { v4 as uuidv4 } from 'uuid';
+import { isEqual } from 'lodash';
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
 const GAME_COUNT = 16;
@@ -20,8 +21,11 @@ const App = () => {
     const [words, setWords] = useState<string[]>([]);
     const [guesses, setGuesses] = useState<Guess[]>(EMPTY_GUESSES);
     const [currentGuess, setCurrentGuess] = useState<number>(0);
-    const [gameStatus, setGameStatus] = useState<GameStatus>(
-        GameStatus.IN_PROGRESS,
+    const [gameStatus, setGameStatus] = useState<GameStatus[]>(
+        Array(GAME_COUNT).fill(GameStatus.IN_PROGRESS),
+    );
+    const [gameEndIndex, setGameEndIndex] = useState<number[]>(
+        Array(GAME_COUNT).fill(-1),
     );
     const [isWord, setIsWord] = useState<boolean[]>([]);
     const { promiseInProgress: loading } = usePromiseTracker();
@@ -31,7 +35,8 @@ const App = () => {
             const newIsWord: boolean[] = Array(guesses.length);
 
             for (let i = 0; i < newIsWord.length; i++) {
-                if (!guesses[i].isFilled || (await !guesses[i].isWord())) {
+                newIsWord[i] = false;
+                if (!guesses[i].isFilled || (await guesses[i].isWord())) {
                     newIsWord[i] = true;
                 }
             }
@@ -57,18 +62,55 @@ const App = () => {
         const games = [];
 
         for (let i = 0; i < GAME_COUNT; i++) {
-            games.push(
-                <Game
-                    key={uuidv4()}
-                    guesses={guesses}
-                    word={words[i]}
-                    isWord={isWord}
-                />,
-            );
+            if (gameStatus[i] === GameStatus.IN_PROGRESS) {
+                games.push(
+                    <Game
+                        key={uuidv4()}
+                        guesses={guesses}
+                        word={words[i]}
+                        isWord={isWord}
+                    />,
+                );
+            } else {
+                games.push(
+                    <Game
+                        key={uuidv4()}
+                        guesses={guesses.slice(0, gameEndIndex[i])}
+                        word={words[i]}
+                        isWord={isWord}
+                    />,
+                );
+            }
         }
 
         return games;
-    }, [guesses, isWord, words]);
+    }, [gameEndIndex, gameStatus, guesses, isWord, words]);
+
+    const updateGameStatus = useCallback(() => {
+        const newGameStatus: GameStatus[] = [];
+        const newGameEndIndex: number[] = [];
+
+        for (let i = 0; i < gameStatus.length; i++) {
+            if (
+                isEqual(guesses[currentGuess].compare(words[i]), [
+                    GuessResult.CORRECT,
+                    GuessResult.CORRECT,
+                    GuessResult.CORRECT,
+                    GuessResult.CORRECT,
+                    GuessResult.CORRECT,
+                ])
+            ) {
+                newGameStatus.push(GameStatus.WIN);
+                newGameEndIndex.push(currentGuess);
+            } else if (currentGuess >= GUESSES_ALLOWED) {
+                newGameStatus.push(GameStatus.LOSS);
+                newGameEndIndex.push(currentGuess);
+            }
+        }
+
+        setGameStatus(newGameStatus);
+        setGameEndIndex(newGameEndIndex);
+    }, [currentGuess, gameStatus.length, guesses, words]);
 
     const updateGuess = useCallback(
         (letter: string) => {
@@ -84,24 +126,19 @@ const App = () => {
     );
 
     const enterGuess = useCallback(async () => {
-        if (
-            guesses[currentGuess].isFilled &&
-            (await guesses[currentGuess].isWord())
-        ) {
-            guesses[currentGuess].entered = true;
-            // if (
-            //     isEqual(guesses[currentGuess].compare(word), [
-            //         GuessResult.CORRECT,
-            //         GuessResult.CORRECT,
-            //         GuessResult.CORRECT,
-            //         GuessResult.CORRECT,
-            //         GuessResult.CORRECT,
-            //     ])
-            // )
-            //     setGameStatus(GameStatus.WIN);
-            setCurrentGuess((prev: number) => prev + 1);
+        try {
+            if (
+                guesses[currentGuess].isFilled &&
+                (await guesses[currentGuess].isWord())
+            ) {
+                guesses[currentGuess].entered = true;
+                updateGameStatus();
+                setCurrentGuess((prev: number) => prev + 1);
+            }
+        } catch (error: unknown) {
+            console.error(error);
         }
-    }, [currentGuess, guesses]);
+    }, [currentGuess, guesses, updateGameStatus]);
 
     const clearGuess = useCallback(() => {
         setGuesses((prev: Guess[]) => {
@@ -125,12 +162,7 @@ const App = () => {
 
     useEffect(() => {
         const handleKeyDown = async (event: Event) => {
-            if (
-                loading ||
-                [GameStatus.WIN, GameStatus.LOSS].includes(gameStatus) ||
-                !(event instanceof KeyboardEvent)
-            )
-                return;
+            if (loading || !(event instanceof KeyboardEvent)) return;
             if (
                 !event.ctrlKey &&
                 !event.shiftKey &&

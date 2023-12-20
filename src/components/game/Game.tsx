@@ -1,5 +1,5 @@
-import Board from './components/board/Board';
-import Guess from './types/Guess';
+import Board from '../board/Board';
+import Guess from '../../types/Guess';
 
 interface GameProps {
     guesses: Guess[];
