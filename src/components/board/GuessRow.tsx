@@ -42,8 +42,9 @@ const GuessRow = ({
                 <Cell
                     key={uuidv4()}
                     letter={guessLetters[index]}
-                    color={guessIsWord ? colors[index] : CellColor.NOT_A_WORD}
+                    color={colors[index]}
                     guessEntered={guessEntered}
+                    guessIsWord={guessIsWord}
                 />
             ))}
         </div>
