@@ -1,14 +1,24 @@
+import axios, { AxiosError, AxiosResponse } from 'axios';
+
 const ALPHABET: string = 'abcdefghijklmnopqrstuvwxyz';
 
 const MAX_LETTERS: number = 5;
 
+export enum GuessResult {
+    WRONG,
+    PARTIAL,
+    CORRECT,
+}
+
 export default class Guess {
     private _letters: string[];
     private _currentIndex: number;
+    private _entered: boolean;
 
     constructor() {
         this._letters = ['', '', '', '', ''];
         this._currentIndex = 0;
+        this._entered = false;
     }
 
     public getLetter(index: number): string | null {
@@ -44,7 +54,35 @@ export default class Guess {
         this._currentIndex += 1;
     }
 
-    public get isValid(): boolean {
+    public compare(word: string): GuessResult[] {
+        const result: GuessResult[] = Array(5).fill(GuessResult.WRONG);
+
+        const wrongMap = new Map<string, number>();
+
+        for (let i = 0; i < this._letters.length; i++) {
+            if (this._letters[i] === word[i]) {
+                result[i] = GuessResult.CORRECT;
+            } else {
+                wrongMap.set(word[i], (wrongMap.get(word[i]) || 0) + 1);
+            }
+        }
+
+        for (let i = 0; i < this._letters.length; i++) {
+            if (result[i] === GuessResult.CORRECT) continue;
+
+            if (wrongMap.has(this._letters[i])) {
+                result[i] = GuessResult.PARTIAL;
+                wrongMap.set(
+                    this._letters[i],
+                    (wrongMap.get(this._letters[i]) || 0) - 1,
+                );
+            }
+        }
+
+        return result;
+    }
+
+    public get isFilled(): boolean {
         for (const letter of this._letters) {
             if (!letter || !ALPHABET.includes(letter)) {
                 return false;
@@ -53,8 +91,42 @@ export default class Guess {
         return true;
     }
 
+    public async isWord(): Promise<boolean> {
+        if (!this.isFilled) {
+            throw new Error(
+                'Failed checking guess.isWord(): guess is not filled',
+            );
+        }
+        if (!process.env.REACT_APP_DICTIONARY_API) {
+            throw new Error('Dictionary API error: no URL could be found');
+        }
+        try {
+            const response: AxiosResponse = await axios.get(
+                `${process.env.REACT_APP_DICTIONARY_API}/${this.toString()}`,
+            );
+            return response.status === 200;
+        } catch (error: unknown) {
+            if (
+                error instanceof AxiosError &&
+                error?.response?.status === 404
+            ) {
+                return false;
+            } else {
+                throw error;
+            }
+        }
+    }
+
     public get letters(): string[] {
         return this._letters;
+    }
+
+    public get entered(): boolean {
+        return this._entered;
+    }
+
+    public set entered(newEntered: boolean) {
+        this._entered = newEntered;
     }
 
     public toString(): string {

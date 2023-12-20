@@ -1,18 +1,51 @@
-import Guess from '../../types/Guess';
-import Cell from './Cell';
+import { v4 as uuidv4 } from 'uuid';
+import { useEffect, useState } from 'react';
+import { GuessResult } from '../../types/Guess';
+import Cell, { CellColor } from './Cell';
 
 export interface GuessRowProps {
-    guess: Guess;
+    guessLetters: string[];
+    guessResult: GuessResult[];
+    guessEntered?: boolean;
+    guessIsWord?: boolean;
 }
 
-const GuessRow = ({ guess }: GuessRowProps) => {
+const RESULT_TO_COLOR_MAP = {
+    [GuessResult.CORRECT]: CellColor.CORRECT,
+    [GuessResult.PARTIAL]: CellColor.PARTIAL,
+    [GuessResult.WRONG]: CellColor.WRONG,
+};
+
+const GuessRow = ({
+    guessLetters,
+    guessResult,
+    guessEntered = false,
+    guessIsWord = true,
+}: GuessRowProps) => {
+    const [colors, setColors] = useState<CellColor[]>([]);
+
+    useEffect(() => {
+        const colors: CellColor[] = [
+            RESULT_TO_COLOR_MAP[guessResult[0]] || CellColor.NOT_ENTERED,
+            RESULT_TO_COLOR_MAP[guessResult[1]] || CellColor.NOT_ENTERED,
+            RESULT_TO_COLOR_MAP[guessResult[2]] || CellColor.NOT_ENTERED,
+            RESULT_TO_COLOR_MAP[guessResult[3]] || CellColor.NOT_ENTERED,
+            RESULT_TO_COLOR_MAP[guessResult[4]] || CellColor.NOT_ENTERED,
+        ];
+
+        setColors(colors);
+    }, [guessEntered, guessResult]);
+
     return (
         <div className='grid grid-cols-5 gap-1'>
-            <Cell letter={guess.getLetter(0)} />
-            <Cell letter={guess.getLetter(1)} />
-            <Cell letter={guess.getLetter(2)} />
-            <Cell letter={guess.getLetter(3)} />
-            <Cell letter={guess.getLetter(4)} />
+            {[0, 1, 2, 3, 4].map((index: number) => (
+                <Cell
+                    key={uuidv4()}
+                    letter={guessLetters[index]}
+                    color={guessIsWord ? colors[index] : CellColor.NOT_A_WORD}
+                    guessEntered={guessEntered}
+                />
+            ))}
         </div>
     );
 };
