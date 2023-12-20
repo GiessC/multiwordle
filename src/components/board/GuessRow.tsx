@@ -14,6 +14,7 @@ const RESULT_TO_COLOR_MAP = {
     [GuessResult.CORRECT]: CellColor.CORRECT,
     [GuessResult.PARTIAL]: CellColor.PARTIAL,
     [GuessResult.WRONG]: CellColor.WRONG,
+    [GuessResult.NONE]: CellColor.NOT_ENTERED,
 };
 
 const GuessRow = ({

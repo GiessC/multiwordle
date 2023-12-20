@@ -9,6 +9,7 @@ export enum GuessResult {
     WRONG,
     PARTIAL,
     CORRECT,
+    NONE,
 }
 
 export default class Guess {
