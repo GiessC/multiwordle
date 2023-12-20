@@ -1,4 +1,5 @@
-import axios, { AxiosError, AxiosResponse } from 'axios';
+import axios, { AxiosError } from 'axios';
+import { trackPromise } from 'react-promise-tracker';
 
 const ALPHABET: string = 'abcdefghijklmnopqrstuvwxyz';
 
@@ -55,6 +56,8 @@ export default class Guess {
     }
 
     public compare(word: string): GuessResult[] {
+        if (!word) return [];
+
         const result: GuessResult[] = Array(5).fill(GuessResult.WRONG);
 
         const wrongMap = new Map<string, number>();
@@ -101,19 +104,28 @@ export default class Guess {
             throw new Error('Dictionary API error: no URL could be found');
         }
         try {
-            const response: AxiosResponse = await axios.get(
-                `${process.env.REACT_APP_DICTIONARY_API}/${this.toString()}`,
+            const response = await trackPromise(
+                axios.get(
+                    `${
+                        process.env.REACT_APP_DICTIONARY_API
+                    }/${this.toString()}`,
+                ),
             );
-            return response.status === 200;
+            console.debug(response);
+            return true;
         } catch (error: unknown) {
-            if (
-                error instanceof AxiosError &&
-                error?.response?.status === 404
-            ) {
-                return false;
+            if (error instanceof AxiosError) {
+                if (error?.response?.status === 404) return false;
+                if (error.response?.status === 429)
+                    throw new Error(
+                        'Too many requests! Guesses are being entered too quick for us too keep up!',
+                    );
+                console.error(error);
             } else {
                 throw error;
             }
+        } finally {
+            return false;
         }
     }
 
